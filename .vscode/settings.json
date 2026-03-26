@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "main.h": "c",
+        "*.h": "c",
+        "*.c": "c",
+        "*.cpp": "cpp",
+        "*.s": "asm",
+        "*.ld": "linker-script"
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.intelliSenseEngine": "default"
+}

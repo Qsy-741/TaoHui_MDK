@@ -1,0 +1,55 @@
+# Keil MDK Build Outputs
+*.o
+*.d
+*.lst
+*.htm
+*.lnp
+*.map
+*.hex
+*.bin
+*.axf
+*.dep
+*.sct
+*.scr
+*.obj
+*.crf
+
+# Keil Project Files
+*.uvprojx
+*.uvoptx
+*.uvguix.*
+*.uvoptb
+*.uvprojb
+*.bak
+
+# Debug Files
+*.jref
+*.img
+*.pdsc
+
+# Listing Files
+*.lst
+*.m51
+*.plg
+*.rpt
+*.m66
+
+# STM32CubeMX Generated Files
+*.mxproject
+Core/Src/main.o
+Core/Src/main.d
+Core/Src/main.i
+
+# FreeRTOS build artifacts
+*.list
+*.map
+
+# Temporary files
+*.tmp
+*~
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
