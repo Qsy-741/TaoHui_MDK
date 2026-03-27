@@ -2,6 +2,12 @@
  ******************************************************************************
  * @file    display.c
  * @brief   Display task implementation - OLED scroll display
+ * @details This module manages the SSD1306 OLED display, implementing a
+ *         scrolling page display for system sensor data and status.
+ *         Display is divided into 3 pages that rotate every 2 seconds:
+ *         - Page 0: ADC values (4 channels)
+ *         - Page 1: Temperature and humidity
+ *         - Page 2: Switch states
  ******************************************************************************
  */
 
@@ -15,6 +21,9 @@
 #define DISPLAY_SCROLL_DELAY_MS    2000
 #define DISPLAY_PAGE_COUNT         3
 
+/**
+ * @brief Display task context structure
+ */
 typedef struct {
     uint8_t current_page;
     uint32_t last_switch_tick;
@@ -30,6 +39,12 @@ static void Display_ShowPage1(void);
 static void Display_ShowPage2(void);
 static void Display_UpdateScroll(void);
 
+/**
+ * @brief Display task entry function
+ * @param argument: Task argument (unused)
+ * @retval None
+ * @note Overrides weak definition in freertos.c
+ */
 void Task_Display_Handler(void *argument)
 {
     (void)argument;
@@ -47,6 +62,10 @@ void Task_Display_Handler(void *argument)
     }
 }
 
+/**
+ * @brief Update display by scrolling to next page
+ * @retval None
+ */
 static void Display_UpdateScroll(void)
 {
     ssd1306_Fill(Black);
@@ -59,6 +78,11 @@ static void Display_UpdateScroll(void)
     }
 }
 
+/**
+ * @brief Fill display with content of specified page
+ * @param page: Page index (0, 1, 2)
+ * @retval None
+ */
 static void Display_FillPage(int page)
 {
     switch (page) {
@@ -74,6 +98,10 @@ static void Display_FillPage(int page)
     }
 }
 
+/**
+ * @brief Display Page 0 - ADC sensor values
+ * @retval None
+ */
 static void Display_ShowPage0(void)
 {
     char line[32];
@@ -98,6 +126,10 @@ static void Display_ShowPage0(void)
     ssd1306_WriteString(line, Font_6x8, White);
 }
 
+/**
+ * @brief Display Page 1 - Environment data (temperature, humidity)
+ * @retval None
+ */
 static void Display_ShowPage1(void)
 {
     char line[32];
@@ -114,6 +146,10 @@ static void Display_ShowPage1(void)
     ssd1306_WriteString(line, Font_6x8, White);
 }
 
+/**
+ * @brief Display Page 2 - Switch states
+ * @retval None
+ */
 static void Display_ShowPage2(void)
 {
     char line[32];

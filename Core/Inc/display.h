@@ -2,6 +2,9 @@
  ******************************************************************************
  * @file    display.h
  * @brief   Display task header - OLED display management
+ * @details This module provides the interface for the display task which
+ *         manages the SSD1306 OLED display. The display shows system data
+ *         in a scrolling page format.
  ******************************************************************************
  */
 

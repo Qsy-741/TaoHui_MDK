@@ -29,6 +29,7 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
 
+/* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "ssd1306.h"
 #include "cli.h"
@@ -43,7 +44,6 @@ typedef struct {
     float temperature;
     float humidity;
     uint8_t switch_state[4];
-    uint32_t last_update_tick;
 } SystemDataSet_t;
 
 extern volatile SystemDataSet_t g_sys_data;
@@ -67,6 +67,11 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LightSensor_Pin GPIO_PIN_1
+#define LightSensor_GPIO_Port GPIOB
+#define DhtSensor_Pin GPIO_PIN_10
+#define DhtSensor_GPIO_Port GPIOB
+#define DhtSensor_EXTI_IRQn EXTI15_10_IRQn
 
 /* USER CODE BEGIN Private defines */
 
