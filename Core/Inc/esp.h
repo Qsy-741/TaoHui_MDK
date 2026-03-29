@@ -9,8 +9,8 @@
 #define __ESP_H__
 
 #define ESP_UART_BAUD_RATE    115200
-#define ESP_WIFI_SSID        "YourWiFiSSID"
-#define ESP_WIFI_PASSWORD    "YourWiFiPassword"
+#define ESP_WIFI_SSID        "WiFi7"
+#define ESP_WIFI_PASSWORD    "12345678"
 
 void Task_ESP_Handler(void *argument);
 

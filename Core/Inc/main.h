@@ -40,10 +40,11 @@ extern "C" {
 #include <stdint.h>
 
 typedef struct {
-    float adc_values[4];
-    float temperature;
-    float humidity;
-    uint8_t switch_state[4];
+    uint16_t sensor_values[3];     // [0]: water level, [1]: soil moisture, [2]: brightness
+    float temperature;       // DHT11 temperature sensor
+    float humidity;          // DHT11 humidity sensor
+    uint16_t CO2;            // JW01 CO2 sensor (UART3)
+    uint8_t switch_state[2];
 } SystemDataSet_t;
 
 extern volatile SystemDataSet_t g_sys_data;
@@ -67,9 +68,19 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define Fan1_Pin GPIO_PIN_4
+#define Fan1_GPIO_Port GPIOA
+#define Fan2_Pin GPIO_PIN_5
+#define Fan2_GPIO_Port GPIOA
+#define Switch_Pin GPIO_PIN_6
+#define Switch_GPIO_Port GPIOA
 #define LightSensor_Pin GPIO_PIN_1
 #define LightSensor_GPIO_Port GPIOB
-#define DhtSensor_Pin GPIO_PIN_10
+#define CO2A_Pin GPIO_PIN_10
+#define CO2A_GPIO_Port GPIOB
+#define CO2B_Pin GPIO_PIN_11
+#define CO2B_GPIO_Port GPIOB
+#define DhtSensor_Pin GPIO_PIN_12
 #define DhtSensor_GPIO_Port GPIOB
 #define DhtSensor_EXTI_IRQn EXTI15_10_IRQn
 

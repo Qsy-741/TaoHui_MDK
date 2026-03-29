@@ -49,12 +49,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-volatile SystemDataSet_t g_sys_data = {
-    .adc_values = {0.0f, 0.0f, 0.0f, 0.0f},
-    .temperature = 0.0f,
-    .humidity = 0.0f,
-    .switch_state = {0, 1, 0, 1}
-};
+volatile SystemDataSet_t g_sys_data;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,6 +98,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_ADC1_Init();
   MX_TIM2_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

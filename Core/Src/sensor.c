@@ -1,10 +1,11 @@
 /**
  ******************************************************************************
  * @file    sensor.c
- * @brief   Sensor task implementation - ADC and DHT11 sensor data acquisition
+ * @brief   Sensor task implementation - ADC and sensor data acquisition
  * @details This module handles periodic sensor data collection including:
- *         - 4-channel ADC via DMA
+ *         - 3-channel ADC via DMA (brightness, soil moisture, water level)
  *         - DHT11 temperature and humidity sensor
+ *         - JW01 CO2 sensor via UART3 DMA+IDLE
  *         Data is updated to the global SystemDataSet_t structure.
  ******************************************************************************
  */
@@ -13,16 +14,13 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
-// #include "dht11.h"
+#include "usart.h"
 #include <string.h>
 #include "tim.h"
 
-#define ADC_CHANNEL_COUNT    4
+#define ADC_CHANNEL_COUNT    3
 
 extern volatile SystemDataSet_t g_sys_data;
-// extern volatile DHT11_State_t dht11_state;
-// extern volatile uint32_t last_time;
-// extern volatile uint8_t dht11_buffer[5];
 
 static uint16_t g_adc_dma_buffer[ADC_CHANNEL_COUNT];
 
@@ -30,6 +28,17 @@ extern ADC_HandleTypeDef hadc1;
 extern DMA_HandleTypeDef hdma_adc1;
 extern TIM_HandleTypeDef htim2;
 extern osThreadId Task_SensorHandle;
+
+extern UART_HandleTypeDef huart3;
+extern DMA_HandleTypeDef hdma_usart3_rx;
+#define JW01_UART_HANDLE    (&huart3)
+
+#define JW01_FRAME_LEN      6
+#define JW01_RX_BUFFER_SIZE 64
+
+static uint8_t g_jw01_rx_buffer[JW01_RX_BUFFER_SIZE];
+static volatile uint8_t g_jw01_data_valid = 0;
+static uint16_t g_jw01_co2_value = 0;
 
 // DHT11 状态机枚举
 typedef enum {
@@ -115,6 +124,62 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     }
 }
 
+static uint8_t JW01_CalculateChecksum(uint8_t* data, uint8_t len)
+{
+    uint8_t sum = 0;
+    for (uint8_t i = 0; i < len; i++) {
+        sum += data[i];
+    }
+    return sum;
+}
+
+static void JW01_ParseFrame(uint8_t* frame)
+{
+    if (frame[0] != 0x2C) {
+        return;
+    }
+
+    uint8_t checksum = JW01_CalculateChecksum(frame, JW01_FRAME_LEN - 1);
+    if (checksum != frame[JW01_FRAME_LEN - 1]) {
+        return;
+    }
+
+    g_jw01_co2_value = (uint16_t)(frame[1] << 8) | frame[2];
+    g_jw01_data_valid = 1;
+}
+
+void JW01_StartDMA(void)
+{
+    memset(g_jw01_rx_buffer, 0, JW01_RX_BUFFER_SIZE);
+    HAL_UART_Receive_DMA(JW01_UART_HANDLE, g_jw01_rx_buffer, JW01_RX_BUFFER_SIZE);
+}
+
+static void JW01_UART_IDLE_Callback(void)
+{
+    uint16_t dma_counter = __HAL_DMA_GET_COUNTER(&hdma_usart3_rx);
+    uint16_t frame_start = JW01_RX_BUFFER_SIZE - dma_counter;
+
+    if (frame_start >= JW01_FRAME_LEN) {
+        uint8_t frame[JW01_FRAME_LEN];
+        uint16_t offset = frame_start - JW01_FRAME_LEN;
+
+        for (uint8_t i = 0; i < JW01_FRAME_LEN; i++) {
+            frame[i] = g_jw01_rx_buffer[(offset + i) % JW01_RX_BUFFER_SIZE];
+        }
+
+        JW01_ParseFrame(frame);
+    }
+
+    JW01_StartDMA();
+}
+
+void HAL_UART_IDLECallback(UART_HandleTypeDef* huart)
+{
+    if (huart->Instance == JW01_UART_HANDLE->Instance) {
+        JW01_UART_IDLE_Callback();
+    }
+}
+
 /**
  * @brief Read ADC values via DMA
  * @retval None
@@ -137,6 +202,21 @@ static void Sensor_ReadADC(void)
     }
 }
 
+uint8_t map_value(uint32_t input) {
+    if (input > 2800) {
+        input = 2800;
+    }
+    
+    return (input * 100) / 2800;
+}
+
+static void Sensor_Convert(uint16_t adc_value[3])
+{
+    g_sys_data.sensor_values[2] = 100 - map_value(adc_value[2]+500);//校准最大值2500
+    g_sys_data.sensor_values[1] = 100 - map_value(adc_value[1]);//校准值最大2800
+    g_sys_data.sensor_values[0] = map_value(adc_value[0]);//校准最大值2500
+}
+
 /**
  * @brief Sensor task entry function
  * @param argument: Task argument (unused)
@@ -146,36 +226,25 @@ static void Sensor_ReadADC(void)
 void Task_Sensor_Handler(void *argument)
 {
     (void)argument;
-    // 启动微秒级定时器
     HAL_TIM_Base_Start(&htim2);
+    JW01_StartDMA();
     uint32_t cycle_tick = osKernelGetTickCount();
 
     for (;;) {
         Sensor_ReadADC();
-
-        g_sys_data.adc_values[0] = (float)g_adc_dma_buffer[0] * 3.3f / 4095.0f;
-        g_sys_data.adc_values[1] = (float)g_adc_dma_buffer[1] * 3.3f / 4095.0f;
-        g_sys_data.adc_values[2] = (float)g_adc_dma_buffer[2] * 3.3f / 4095.0f;
-        g_sys_data.adc_values[3] = (float)g_adc_dma_buffer[3] * 3.3f / 4095.0f;
-
+        Sensor_Convert(g_adc_dma_buffer);
         DHT11_Pin_Output();
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
-        // FreeRTOS延时20ms (此时CPU释放给其他任务，非阻塞！)
-        osDelay(20); 
-        // 拉高引脚，准备接收
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
-        // 2. 切换到中断模式，开启接收状态机
+        HAL_GPIO_WritePin(DHT11_GPIO_PORT, DHT11_GPIO_PIN, GPIO_PIN_RESET);
+        osDelay(20);
+        HAL_GPIO_WritePin(DHT11_GPIO_PORT, DHT11_GPIO_PIN, GPIO_PIN_SET);
         last_time = __HAL_TIM_GET_COUNTER(&htim2);
         dht11_state = DHT11_WAIT_RESPONSE;
         DHT11_Pin_EXTI();
-        // 3. 挂起任务，等待中断接收完毕 (设置超时时间为 1000ms)
-        // osThreadFlagsWait 相当于一个轻量级的二值信号量
         uint32_t flags = osThreadFlagsWait(0x01, osFlagsWaitAny, pdMS_TO_TICKS(1000));
-        if (flags == 0x01) 
+        if (flags == 0x01)
         {
-            // 成功收到40位数据，校验校验和
             uint8_t sum = dht11_buffer[0] + dht11_buffer[1] + dht11_buffer[2] + dht11_buffer[3];
-            if (sum == dht11_buffer[4]) 
+            if (sum == dht11_buffer[4])
             {
                 g_sys_data.humidity = dht11_buffer[0] + (float)dht11_buffer[1]/10.0f;
                 g_sys_data.temperature = dht11_buffer[2] + (float)dht11_buffer[3]/10.0f;
@@ -183,8 +252,12 @@ void Task_Sensor_Handler(void *argument)
         }
         else
         {
-            // 超时，说明传感器未连接或读取失败
-            dht11_state = DHT11_IDLE; // 复位状态机
+            dht11_state = DHT11_IDLE;
+        }
+
+        if (g_jw01_data_valid) {
+            g_sys_data.CO2 = g_jw01_co2_value;
+            g_jw01_data_valid = 0;
         }
 
         vTaskDelayUntil(&cycle_tick, pdMS_TO_TICKS(SENSOR_READ_INTERVAL_MS));

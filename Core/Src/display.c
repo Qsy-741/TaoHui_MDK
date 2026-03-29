@@ -5,8 +5,8 @@
  * @details This module manages the SSD1306 OLED display, implementing a
  *         scrolling page display for system sensor data and status.
  *         Display is divided into 3 pages that rotate every 2 seconds:
- *         - Page 0: ADC values (4 channels)
- *         - Page 1: Temperature and humidity
+ *         - Page 0: ADC values (water level, soil moisture, brightness)
+ *         - Page 1: Environment (temperature, humidity, CO2)
  *         - Page 2: Switch states
  ******************************************************************************
  */
@@ -21,16 +21,6 @@
 #define DISPLAY_SCROLL_DELAY_MS    2000
 #define DISPLAY_PAGE_COUNT         3
 
-/**
- * @brief Display task context structure
- */
-typedef struct {
-    uint8_t current_page;
-    uint32_t last_switch_tick;
-} display_context_t;
-
-static display_context_t g_display_ctx;
-
 extern volatile SystemDataSet_t g_sys_data;
 
 static void Display_FillPage(int page);
@@ -39,18 +29,13 @@ static void Display_ShowPage1(void);
 static void Display_ShowPage2(void);
 static void Display_UpdateScroll(void);
 
-/**
- * @brief Display task entry function
- * @param argument: Task argument (unused)
- * @retval None
- * @note Overrides weak definition in freertos.c
- */
+static uint8_t g_current_page = 0;
+
 void Task_Display_Handler(void *argument)
 {
     (void)argument;
 
-    g_display_ctx.current_page = 0;
-    g_display_ctx.last_switch_tick = osKernelGetTickCount();
+    g_current_page = 0;
     ssd1306_Init();
     ssd1306_Fill(Black);
     ssd1306_UpdateScreen();
@@ -62,27 +47,18 @@ void Task_Display_Handler(void *argument)
     }
 }
 
-/**
- * @brief Update display by scrolling to next page
- * @retval None
- */
 static void Display_UpdateScroll(void)
 {
     ssd1306_Fill(Black);
-    Display_FillPage(g_display_ctx.current_page);
+    Display_FillPage(g_current_page);
     ssd1306_UpdateScreen();
 
-    g_display_ctx.current_page++;
-    if (g_display_ctx.current_page >= DISPLAY_PAGE_COUNT) {
-        g_display_ctx.current_page = 0;
+    g_current_page++;
+    if (g_current_page >= DISPLAY_PAGE_COUNT) {
+        g_current_page = 0;
     }
 }
 
-/**
- * @brief Fill display with content of specified page
- * @param page: Page index (0, 1, 2)
- * @retval None
- */
 static void Display_FillPage(int page)
 {
     switch (page) {
@@ -99,7 +75,7 @@ static void Display_FillPage(int page)
 }
 
 /**
- * @brief Display Page 0 - ADC sensor values
+ * @brief Display Page 0 - ADC sensor values (water level, soil moisture, brightness)
  * @retval None
  */
 static void Display_ShowPage0(void)
@@ -107,27 +83,23 @@ static void Display_ShowPage0(void)
     char line[32];
 
     ssd1306_SetCursor(0, 0);
-    ssd1306_WriteString("=== Sensor Data ===", Font_6x8, White);
+    ssd1306_WriteString("=== ADC Sensors ===", Font_7x10, White);
 
-    snprintf(line, sizeof(line), "ADC1: %.2f", (double)g_sys_data.adc_values[0]);
+    snprintf(line, sizeof(line), "Water: %.2f%%", (double)g_sys_data.sensor_values[0]);
     ssd1306_SetCursor(0, 12);
-    ssd1306_WriteString(line, Font_6x8, White);
+    ssd1306_WriteString(line, Font_7x10, White);
 
-    snprintf(line, sizeof(line), "ADC2: %.2f", (double)g_sys_data.adc_values[1]);
+    snprintf(line, sizeof(line), "Soil:  %.2f%%", (double)g_sys_data.sensor_values[1]);
     ssd1306_SetCursor(0, 24);
-    ssd1306_WriteString(line, Font_6x8, White);
+    ssd1306_WriteString(line, Font_7x10, White);
 
-    snprintf(line, sizeof(line), "ADC3: %.2f", (double)g_sys_data.adc_values[2]);
+    snprintf(line, sizeof(line), "Light: %.2f%%", (double)g_sys_data.sensor_values[2]);
     ssd1306_SetCursor(0, 36);
-    ssd1306_WriteString(line, Font_6x8, White);
-
-    snprintf(line, sizeof(line), "ADC4: %.2f", (double)g_sys_data.adc_values[3]);
-    ssd1306_SetCursor(0, 48);
-    ssd1306_WriteString(line, Font_6x8, White);
+    ssd1306_WriteString(line, Font_7x10, White);
 }
 
 /**
- * @brief Display Page 1 - Environment data (temperature, humidity)
+ * @brief Display Page 1 - Environment data (temperature, humidity, CO2)
  * @retval None
  */
 static void Display_ShowPage1(void)
@@ -135,32 +107,32 @@ static void Display_ShowPage1(void)
     char line[32];
 
     ssd1306_SetCursor(0, 0);
-    ssd1306_WriteString("=== Environment ===", Font_6x8, White);
+    ssd1306_WriteString("=== Environment ===", Font_7x10, White);
 
-    snprintf(line, sizeof(line), "Temp: %.1f C", (double)g_sys_data.temperature);
-    ssd1306_SetCursor(0, 16);
-    ssd1306_WriteString(line, Font_6x8, White);
+    snprintf(line, sizeof(line), "Temp:  %.1f C", (double)g_sys_data.temperature);
+    ssd1306_SetCursor(0, 12);
+    ssd1306_WriteString(line, Font_7x10, White);
 
-    snprintf(line, sizeof(line), "Humi: %.1f %%", (double)g_sys_data.humidity);
-    ssd1306_SetCursor(0, 32);
-    ssd1306_WriteString(line, Font_6x8, White);
+    snprintf(line, sizeof(line), "Humi:  %.1f %%", (double)g_sys_data.humidity);
+    ssd1306_SetCursor(0, 24);
+    ssd1306_WriteString(line, Font_7x10, White);
+
+    snprintf(line, sizeof(line), "CO2:   %d ppm", g_sys_data.CO2);
+    ssd1306_SetCursor(0, 36);
+    ssd1306_WriteString(line, Font_7x10, White);
 }
 
-/**
- * @brief Display Page 2 - Switch states
- * @retval None
- */
 static void Display_ShowPage2(void)
 {
     char line[32];
 
     ssd1306_SetCursor(0, 0);
-    ssd1306_WriteString("=== Switch State ===", Font_6x8, White);
+    ssd1306_WriteString("=== Switch State ===", Font_7x10, White);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
         snprintf(line, sizeof(line), "SW%d: %s", i + 1,
                  g_sys_data.switch_state[i] ? "ON " : "OFF");
         ssd1306_SetCursor(0, 12 + i * 12);
-        ssd1306_WriteString(line, Font_6x8, White);
+        ssd1306_WriteString(line, Font_7x10, White);
     }
 }
