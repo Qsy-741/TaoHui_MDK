@@ -15,8 +15,6 @@
 *.crf
 
 # Keil Project Files
-*.uvprojx
-*.uvoptx
 *.uvguix.*
 *.uvoptb
 *.uvprojb
