@@ -160,9 +160,9 @@ CLI_RegisterCommand("cmd_name", "description", CMD_HandlerFunc);
 **ADC通道配置：**
 | 通道 | 引脚 | 功能 | 转换公式 |
 |------|------|------|----------|
-| CH6 | PA6 | 水位传感器 | voltage × factor |
-| CH7 | PA7 | 土壤湿度 | voltage × factor |
-| CH8 | PB0 | 光照强度 | voltage × factor |
+| CH6 | PA7 | 水位传感器 | voltage × factor |
+| CH7 | PB0 | 土壤湿度 | voltage × factor |
+| CH8 | PB1 | 光照强度 | voltage × factor |
 
 ---
 
